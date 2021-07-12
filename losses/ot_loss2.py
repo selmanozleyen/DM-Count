@@ -28,7 +28,7 @@ class OT_Loss(Module):
         assert self.crop_size % self.downsample_ratio == 0
         self.output_size = self.crop_size//self.downsample_ratio 
 
-        self.cood = torch.arange(0, self.crop_size, step=self.downsample_ratio).cuda() + self.downsample_ratio / 2
+        self.cood = torch.arange(0, self.crop_size, step=self.downsample_ratio,device=self.device) + self.downsample_ratio / 2
         self.density_size = self.cood.size(0)
         self.cood.unsqueeze_(0) # [1, #cood]
         if self.norm_cood:
@@ -83,8 +83,6 @@ class OT_Loss(Module):
                 
                 im_grad = im_grad.detach().view([1, w, w])
 
-                
-                
                 loss = loss + (unnormed_density[idx]*im_grad).sum()
 
 
