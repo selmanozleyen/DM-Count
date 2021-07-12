@@ -10,7 +10,7 @@ from datetime import datetime
 
 from datasets.crowd import Crowd_qnrf, Crowd_nwpu, Crowd_sh
 from models import vgg19
-from losses.ot_loss import OT_Loss
+from losses.ot_loss2 import OT_Loss
 from utils.pytorch_utils import Save_Handle, AverageMeter
 import utils.log_utils as log_utils
 
@@ -133,11 +133,13 @@ class Trainer(object):
             with torch.set_grad_enabled(True):
                 outputs, outputs_normed = self.model(inputs)
                 # Compute OT loss.
-                ot_loss, wd, ot_obj_value = self.ot_loss(outputs_normed, outputs, points)
+                ot_loss = self.ot_loss(outputs_normed, outputs, points)
+                wd = 0
+                ot_obj_value = 0
                 ot_loss = ot_loss * self.args.wot
                 ot_obj_value = ot_obj_value * self.args.wot
                 epoch_ot_loss.update(ot_loss.item(), N)
-                epoch_ot_obj_value.update(ot_obj_value.item(), N)
+                epoch_ot_obj_value.update(ot_obj_value, N)
                 epoch_wd.update(wd, N)
 
                 # Compute counting loss.

@@ -9,14 +9,14 @@ parser = argparse.ArgumentParser(description='Test ')
 parser.add_argument('--device', default='0', help='assign device')
 parser.add_argument('--crop-size', type=int, default=512,
                     help='the crop size of the train image')
-parser.add_argument('--model-path', type=str, default='pretrained_models/model_qnrf.pth',
+parser.add_argument('--model-path', type=str, default='ckpts/input-256_wot-0.1_wtv-0.01_reg-10.0_nIter-50_normCood-0/best_model_4.pth',
                     help='saved model path')
 parser.add_argument('--data-path', type=str,
-                    default='data/QNRF-Train-Val-Test',
+                    default='ShanghaiTech/part_A',
                     help='saved model path')
-parser.add_argument('--dataset', type=str, default='qnrf',
+parser.add_argument('--dataset', type=str, default='sha',
                     help='dataset name: qnrf, nwpu, sha, shb')
-parser.add_argument('--pred-density-map-path', type=str, default='',
+parser.add_argument('--pred-density-map-path', type=str, default='./pred',
                     help='save predicted density maps when pred-density-map-path is not empty.')
 
 

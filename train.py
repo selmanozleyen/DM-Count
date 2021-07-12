@@ -10,15 +10,15 @@ def str2bool(v):
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train')
-    parser.add_argument('--data-dir', default='data/UCF-Train-Val-Test', help='data path')
-    parser.add_argument('--dataset', default='qnrf', help='dataset name: qnrf, nwpu, sha, shb')
+    parser.add_argument('--data-dir', default='ShanghaiTech/part_A', help='data path')
+    parser.add_argument('--dataset', default='sha', help='dataset name: qnrf, nwpu, sha, shb')
     parser.add_argument('--lr', type=float, default=1e-5,
                         help='the initial learning rate')
     parser.add_argument('--weight-decay', type=float, default=1e-4,
                         help='the weight decay')
     parser.add_argument('--resume', default='', type=str,
                         help='the path of resume training model')
-    parser.add_argument('--max-epoch', type=int, default=1000,
+    parser.add_argument('--max-epoch', type=int, default=2000,
                         help='max training epoch')
     parser.add_argument('--val-epoch', type=int, default=5,
                         help='the num of steps to log training information')
@@ -27,7 +27,7 @@ def parse_args():
     parser.add_argument('--batch-size', type=int, default=10,
                         help='train batch size')
     parser.add_argument('--device', default='0', help='assign device')
-    parser.add_argument('--num-workers', type=int, default=3,
+    parser.add_argument('--num-workers', type=int, default=12,
                         help='the num of training process')
     parser.add_argument('--crop-size', type=int, default=512,
                         help='the crop size of the train image')
