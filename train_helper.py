@@ -107,6 +107,7 @@ class Trainer(object):
         self.best_mae = np.inf
         self.best_mse = np.inf
         self.best_count = 0
+        
 
     def train(self):
         """training process"""
@@ -114,11 +115,13 @@ class Trainer(object):
         for epoch in range(self.start_epoch, args.max_epoch + 1):
             self.logger.info('-' * 5 + 'Epoch {}/{}'.format(epoch, args.max_epoch) + '-' * 5)
             self.epoch = epoch
-            self.train_eopch()
-            if epoch % args.val_epoch == 0 and epoch >= args.val_start:
+            self.train_epoch()
+            if epoch == 0:
+                self.val_epoch()
+            elif epoch % args.val_epoch == 0 and epoch >= args.val_start:
                 self.val_epoch()
 
-    def train_eopch(self):
+    def train_epoch(self):
         epoch_ot_loss = AverageMeter()
         epoch_ot_obj_value = AverageMeter()
         epoch_wd = AverageMeter()
@@ -232,4 +235,6 @@ class Trainer(object):
                                                                                      self.best_mae,
                                                                                      self.epoch))
             torch.save(model_state_dic, os.path.join(self.save_dir, 'best_model_{}.pth'.format(self.best_count)))
+            mlflow.log_metric('val_best_rmse',self.best_mse,self.best_count)
+            mlflow.log_metric('val_best_mae',self.best_mae,self.best_count)
             self.best_count += 1
