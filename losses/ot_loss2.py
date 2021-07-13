@@ -9,9 +9,8 @@ import torchvision.transforms
 from pytorch_lightning.loggers.tensorboard import SummaryWriter
 import matplotlib.pyplot as plt
 from  matplotlib.figure import Figure
+from .stochastic import solve_semi_dual_entropic, averaged_sgd_entropic_transport
 
-
-from .stochastic import solve_semi_dual_entropic
 class OT_Loss(Module):
     def __init__(self, c_size, downsample_ratio, norm_cood, device, num_of_iter_in_ot=100, reg=10.0):
         super(OT_Loss, self).__init__()
@@ -39,7 +38,8 @@ class OT_Loss(Module):
         batch_size = normed_density.size(0)
         assert len(points) == batch_size
         assert self.output_size == normed_density.size(2)
-        loss = torch.zeros([1],dtype=torch.float32).to('cuda')
+        cupy.cuda.Device(0).use()
+        loss = torch.zeros([1],dtype=torch.float32,device='cuda')
         for idx, im_points in enumerate(points):
             if len(im_points) > 0:
                 src_prob = normed_density[idx].reshape([-1]).detach()
@@ -62,11 +62,11 @@ class OT_Loss(Module):
                 src_prob = cupy.asarray(src_prob)
 
 
-                pi, log= solve_semi_dual_entropic(
-                    target_prob, src_prob, dis, method= self.method,
-                    log=True,lr=None,numItermax=self.num_of_iter_in_ot,reg=self.reg
+                beta = averaged_sgd_entropic_transport(
+                    target_prob, src_prob, dis,
+                    lr=None,numItermax=self.num_of_iter_in_ot,reg=self.reg
                 )
-                alpha,beta = log['alpha'], log['beta']
+
                 w = self.crop_size // self.downsample_ratio
                 
                 src = normed_density[idx]

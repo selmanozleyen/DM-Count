@@ -10,7 +10,7 @@ from datetime import datetime
 
 from datasets.crowd import Crowd_qnrf, Crowd_nwpu, Crowd_sh
 from models import vgg19
-from losses.ot_loss import OT_Loss
+from losses.ot_loss2 import OT_Loss
 from utils.pytorch_utils import Save_Handle, AverageMeter
 import utils.log_utils as log_utils
 
