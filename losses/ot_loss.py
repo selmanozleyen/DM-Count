@@ -60,8 +60,8 @@ class OT_Loss(Module):
                 im_grad = im_grad.detach().view([1, self.output_size, self.output_size])
                 # Define loss = <im_grad, predicted density>. The gradient of loss w.r.t prediced density is im_grad.
                 loss += torch.sum(unnormed_density[idx] * im_grad)
-                #wd += torch.sum(dis * P).item()
+                wd += torch.sum(dis * P).item()
 
-        return loss#, wd, ot_obj_values
+        return loss, wd, ot_obj_values
 
 

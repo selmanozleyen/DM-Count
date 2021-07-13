@@ -1,5 +1,6 @@
 import os
 import time
+import mlflow
 import torch
 import torch.nn as nn
 from torch import optim
@@ -10,7 +11,9 @@ from datetime import datetime
 
 from datasets.crowd import Crowd_qnrf, Crowd_nwpu, Crowd_sh
 from models import vgg19
-from losses.ot_loss2 import OT_Loss
+from losses.ot_loss2 import OT_Loss2
+from losses.ot_loss import OT_Loss
+
 from utils.pytorch_utils import Save_Handle, AverageMeter
 import utils.log_utils as log_utils
 
@@ -91,8 +94,12 @@ class Trainer(object):
         else:
             self.logger.info('random initialization')
 
-        self.ot_loss = OT_Loss(args.crop_size, downsample_ratio, args.norm_cood, self.device, args.num_of_iter_in_ot,
-                               args.reg)
+        if args.ot_ver == 1:
+            self.ot_loss = OT_Loss2(args.crop_size, downsample_ratio, args.norm_cood, self.device, args.num_of_iter_in_ot,
+                                args.reg)
+        else:
+            self.ot_loss = OT_Loss(args.crop_size, downsample_ratio, args.norm_cood, self.device, args.num_of_iter_in_ot,
+                                args.reg)
         self.tv_loss = nn.L1Loss(reduction='none').to(self.device)
         self.mse = nn.MSELoss().to(self.device)
         self.mae = nn.L1Loss().to(self.device)
@@ -133,13 +140,11 @@ class Trainer(object):
             with torch.set_grad_enabled(True):
                 outputs, outputs_normed = self.model(inputs)
                 # Compute OT loss.
-                ot_loss = self.ot_loss(outputs_normed, outputs, points)
-                wd = 0
-                ot_obj_value = 0
+                ot_loss,wd,ot_obj_value = self.ot_loss(outputs_normed, outputs, points)
                 ot_loss = ot_loss * self.args.wot
                 ot_obj_value = ot_obj_value * self.args.wot
                 epoch_ot_loss.update(ot_loss.item(), N)
-                epoch_ot_obj_value.update(ot_obj_value, N)
+                epoch_ot_obj_value.update(ot_obj_value.item(), N)
                 epoch_wd.update(wd, N)
 
                 # Compute counting loss.
@@ -174,6 +179,20 @@ class Trainer(object):
                         epoch_ot_obj_value.get_avg(), epoch_count_loss.get_avg(), epoch_tv_loss.get_avg(),
                         np.sqrt(epoch_mse.get_avg()), epoch_mae.get_avg(),
                         time.time() - epoch_start))
+
+
+        mlflow.log_metric('train_loss',epoch_loss.get_avg(),step=self.epoch)
+        mlflow.log_metric('ot_loss',epoch_ot_loss.get_avg(),step=self.epoch)
+        mlflow.log_metric('wd',epoch_wd.get_avg(),step=self.epoch)
+        mlflow.log_metric('ot_obj',epoch_ot_obj_value.get_avg(),step=self.epoch)
+        mlflow.log_metric('count_loss',epoch_count_loss.get_avg(),step=self.epoch)
+        mlflow.log_metric('tv_loss',epoch_tv_loss.get_avg(),step=self.epoch)
+        mlflow.log_metric('train_rmse',np.sqrt(epoch_mse.get_avg()),step=self.epoch)
+        mlflow.log_metric('train_mae',epoch_mae.get_avg(),step=self.epoch)
+        mlflow.log_metric('epoch_train_time',time.time() - epoch_start,step=self.epoch)
+
+
+
         model_state_dic = self.model.state_dict()
         save_path = os.path.join(self.save_dir, '{}_ckpt.tar'.format(self.epoch))
         torch.save({
@@ -201,6 +220,9 @@ class Trainer(object):
         mae = np.mean(np.abs(epoch_res))
         self.logger.info('Epoch {} Val, MSE: {:.2f} MAE: {:.2f}, Cost {:.1f} sec'
                          .format(self.epoch, mse, mae, time.time() - epoch_start))
+        mlflow.log_metric('val_rmse',mse,step=self.epoch)
+        mlflow.log_metric('val_mae',mae,step=self.epoch)
+        mlflow.log_metric('val_epoch_time',time.time() - epoch_start,step=self.epoch)
 
         model_state_dic = self.model.state_dict()
         if (2.0 * mse + mae) < (2.0 * self.best_mse + self.best_mae):

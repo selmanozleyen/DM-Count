@@ -2,7 +2,7 @@ import argparse
 import os
 import torch
 from train_helper import Trainer
-
+import mlflow
 
 def str2bool(v):
     return v.lower() in ("yes", "true", "t", "1")
@@ -38,7 +38,7 @@ def parse_args():
     parser.add_argument('--num-of-iter-in-ot', type=int, default=100,
                         help='sinkhorn iterations')
     parser.add_argument('--norm-cood', type=int, default=0, help='whether to norm cood when computing distance')
-
+    parser.add_argument('--ot-ver', type=int, default=0, help='ot version, 0 for sinkhorn, 1 for sdot')
     args = parser.parse_args()
 
     if args.dataset.lower() == 'qnrf':
@@ -57,8 +57,17 @@ def parse_args():
 
 if __name__ == '__main__':
     args = parse_args()
-    torch.backends.cudnn.benchmark = True
-    os.environ['CUDA_VISIBLE_DEVICES'] = args.device.strip()  # set vis gpu
-    trainer = Trainer(args)
-    trainer.setup()
-    trainer.train()
+    dont_log = [
+        'device',
+    ]
+    
+
+    with mlflow.start_run():
+        for k,v in vars(args).items():
+            if not k in dont_log:
+                mlflow.log_param(k,v)
+        torch.backends.cudnn.benchmark = True
+        os.environ['CUDA_VISIBLE_DEVICES'] = args.device.strip()  # set vis gpu
+        trainer = Trainer(args)
+        trainer.setup()
+        trainer.train()

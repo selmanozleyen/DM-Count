@@ -11,9 +11,9 @@ import matplotlib.pyplot as plt
 from  matplotlib.figure import Figure
 from .stochastic import solve_semi_dual_entropic, averaged_sgd_entropic_transport
 
-class OT_Loss(Module):
+class OT_Loss2(Module):
     def __init__(self, c_size, downsample_ratio, norm_cood, device, num_of_iter_in_ot=100, reg=10.0):
-        super(OT_Loss, self).__init__()
+        super(OT_Loss2, self).__init__()
         assert c_size % downsample_ratio == 0
         self.downsample_ratio = downsample_ratio
         self.crop_size = c_size
@@ -40,6 +40,8 @@ class OT_Loss(Module):
         assert self.output_size == normed_density.size(2)
         cupy.cuda.Device(0).use()
         loss = torch.zeros([1],dtype=torch.float32,device='cuda')
+        ot_obj_values = torch.zeros([1],dtype=torch.float32,device='cuda')
+        wd = 0 # wasserstain distance
         for idx, im_points in enumerate(points):
             if len(im_points) > 0:
                 src_prob = normed_density[idx].reshape([-1]).detach()
@@ -62,28 +64,30 @@ class OT_Loss(Module):
                 src_prob = cupy.asarray(src_prob)
 
 
-                beta = averaged_sgd_entropic_transport(
-                    target_prob, src_prob, dis,
-                    lr=None,numItermax=self.num_of_iter_in_ot,reg=self.reg
-                )
+                # beta = averaged_sgd_entropic_transport(
+                #     target_prob, src_prob, dis,
+                #     lr=None,numItermax=self.num_of_iter_in_ot,reg=self.reg
+                # )
+                pi, log = solve_semi_dual_entropic(target_prob,src_prob,dis,
+                reg=self.reg,numItermax=self.num_of_iter_in_ot,lr=None,log=True,method='asgd')
 
                 w = self.crop_size // self.downsample_ratio
                 
-                src = normed_density[idx]
                 
 
-                beta = torch.as_tensor(beta,device='cuda')
-
+                beta = torch.as_tensor(log['beta'],device='cuda')
+                ot_obj_values += torch.sum(normed_density[idx] * beta.view([1, self.output_size, self.output_size]))
 
                 source_density = unnormed_density[idx].view([-1]).detach()
                 source_count = source_density.sum()
-                im_grad_1 = (source_count) / (source_count * source_count+1e-8) * beta # size of [#cood * #cood]
-                im_grad_2 = (source_density * beta).sum() / (source_count * source_count + 1e-8) # size of 1
+                im_grad_1 = (source_count) / (source_count * source_count + 1e-16) * beta # size of [#cood * #cood]
+                im_grad_2 = (source_density * beta).sum() / (source_count * source_count + 1e-16) # size of 1
                 im_grad = im_grad_1 - im_grad_2
                 
                 im_grad = im_grad.detach().view([1, w, w])
 
-                loss = loss + (unnormed_density[idx]*im_grad).sum()
+                loss += torch.sum(unnormed_density[idx]*im_grad)
+                wd += cupy.sum(dis * pi).item()
 
 
-        return loss
+        return loss, wd, ot_obj_values
