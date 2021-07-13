@@ -10,7 +10,7 @@ Stochastic solvers for regularized OT.
 
 import cupy as cp
 
-
+EPS = 1e-16
 ##############################################################################
 # Optimization toolbox for SEMI - DUAL problems
 ##############################################################################
@@ -82,8 +82,8 @@ def coordinate_grad_semi_dual(b, M, reg, beta, i):
           arXiv preprint arxiv:1605.08527.
     '''
     r = M[i, :] - beta
-    exp_beta = cp.exp(-r / (reg + 1e-7)) * b
-    khi = exp_beta / (cp.sum(exp_beta)+1e-7)
+    exp_beta = cp.exp(-r / reg) * b
+    khi = exp_beta / (cp.sum(exp_beta)+EPS)
     return b - khi
 
 
@@ -164,7 +164,7 @@ def sag_entropic_transport(a, b, M, reg, numItermax=10000, lr=None):
     '''
 
     if lr is None:
-        lr = 1. / max(a / (reg+1e-7))
+        lr = 1. / max(a / reg)
     n_source = cp.shape(M)[0]
     n_target = cp.shape(M)[1]
     cur_beta = cp.zeros(n_target)
@@ -253,7 +253,7 @@ def averaged_sgd_entropic_transport(a, b, M, reg, numItermax=300000, lr=None):
     '''
 
     if lr is None:
-        lr = 1. / max(a / (reg+1e-7))
+        lr = 1. / max(a / reg)
     n_source = cp.shape(M)[0]
     n_target = cp.shape(M)[1]
     cur_beta = cp.zeros(n_target)
@@ -337,8 +337,8 @@ def c_transform_entropic(b, M, reg, beta):
     for i in range(n_source):
         r = M[i, :] - beta
         min_r = cp.min(r)
-        exp_beta = cp.exp(-(r - min_r) / (reg+1e-7)) * b
-        alpha[i] = min_r - reg * cp.log(cp.sum(exp_beta)+1e-7)
+        exp_beta = cp.exp(-(r - min_r) / reg) * b
+        alpha[i] = min_r - reg * cp.log(cp.sum(exp_beta)+EPS)
     return alpha
 
 
@@ -437,7 +437,7 @@ def solve_semi_dual_entropic(a, b, M, reg, method, numItermax=10000, lr=None,
         return None
 
     opt_alpha = c_transform_entropic(b, M, reg, opt_beta)
-    pi = (cp.exp((opt_alpha[:, None] + opt_beta[None, :] - M[:, :]) / (reg+1e-7)) *
+    pi = (cp.exp((opt_alpha[:, None] + opt_beta[None, :] - M[:, :]) / reg) *
           a[:, None] * b[None, :])
 
     if log:
@@ -541,7 +541,7 @@ def batch_grad_dual(a, b, M, reg, alpha, beta, batch_size, batch_alpha,
                       arXiv preprint arxiv:1711.02283.
     '''
     G = - (cp.exp((alpha[batch_alpha, None] + beta[None, batch_beta] -
-                   M[batch_alpha, :][:, batch_beta]) / (reg+1e-7)) *
+                   M[batch_alpha, :][:, batch_beta]) / reg) *
            a[batch_alpha, None] * b[None, batch_beta])
     grad_beta = cp.zeros(cp.shape(M)[1])
     grad_alpha = cp.zeros(cp.shape(M)[0])
@@ -744,7 +744,7 @@ def solve_dual_entropic(a, b, M, reg, batch_size, numItermax=10000, lr=1,
 
     opt_alpha, opt_beta = sgd_entropic_regularization(a, b, M, reg, batch_size,
                                                       numItermax, lr)
-    pi = (cp.exp((opt_alpha[:, None] + opt_beta[None, :] - M[:, :]) / (reg+1e-7)) *
+    pi = (cp.exp((opt_alpha[:, None] + opt_beta[None, :] - M[:, :]) / reg) *
           a[:, None] * b[None, :])
     if log:
         log = {}
