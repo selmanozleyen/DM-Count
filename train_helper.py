@@ -32,8 +32,8 @@ class Trainer(object):
 
     def setup(self):
         args = self.args
-        sub_dir = 'input-{}_wot-{}_wtv-{}_reg-{}_nIter-{}_normCood-{}'.format(
-            args.crop_size, args.wot, args.wtv, args.reg, args.num_of_iter_in_ot, args.norm_cood)
+        sub_dir = 'input-{}_wot-{}_wtv-{}_reg-{}_nIter-{}_normCood-{}_otVer-{}'.format(
+            args.crop_size, args.wot, args.wtv, args.reg, args.num_of_iter_in_ot, args.norm_cood,args.ot_ver)
 
         self.save_dir = os.path.join('ckpts', sub_dir)
         if not os.path.exists(self.save_dir):
