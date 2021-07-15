@@ -165,8 +165,8 @@ def sinkhorn_knopp(a, b, C, reg=1e-1, maxIter=1000, stopThr=1e-9,
     err = 1
 
     # allocate memory beforehand
-    KTu = torch.empty(v.shape, dtype=v.dtype).to(device)
-    Kv = torch.empty(u.shape, dtype=u.dtype).to(device)
+    KTu = torch.empty(v.shape, dtype=v.dtype,device=device)
+    Kv = torch.empty(u.shape, dtype=u.dtype,device=device)
 
     while (err > stopThr and it <= maxIter):
         upre, vpre = u, v
@@ -202,6 +202,7 @@ def sinkhorn_knopp(a, b, C, reg=1e-1, maxIter=1000, stopThr=1e-9,
         log['v'] = v
         log['alpha'] = reg * torch.log(u + M_EPS)
         log['beta'] = reg * torch.log(v + M_EPS)
+        log['K'] = K
 
     # transport plan
     P = u.reshape(-1, 1) * K * v.reshape(1, -1)

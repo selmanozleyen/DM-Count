@@ -11,6 +11,8 @@ from datetime import datetime
 
 from datasets.crowd import Crowd_qnrf, Crowd_nwpu, Crowd_sh
 from models import vgg19
+from models2 import vgg19_2
+from losses.ot_loss3 import OT_Loss3
 from losses.ot_loss2 import OT_Loss2
 from losses.ot_loss import OT_Loss
 
@@ -76,7 +78,10 @@ class Trainer(object):
                                           num_workers=args.num_workers * self.device_count,
                                           pin_memory=(True if x == 'train' else False))
                             for x in ['train', 'val']}
-        self.model = vgg19()
+        if args.ot_ver == 2:
+            self.model = vgg19_2()
+        else:
+            self.model = vgg19()
         self.model.to(self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 
@@ -97,6 +102,9 @@ class Trainer(object):
         if args.ot_ver == 1:
             self.ot_loss = OT_Loss2(args.crop_size, downsample_ratio, args.norm_cood, self.device, args.num_of_iter_in_ot,
                                 args.reg)
+        elif args.ot_ver == 2:
+            self.ot_loss = OT_Loss3(args.crop_size, downsample_ratio, args.norm_cood, self.device, args.num_of_iter_in_ot,
+                                args.reg)
         else:
             self.ot_loss = OT_Loss(args.crop_size, downsample_ratio, args.norm_cood, self.device, args.num_of_iter_in_ot,
                                 args.reg)
@@ -107,6 +115,7 @@ class Trainer(object):
         self.best_mae = np.inf
         self.best_mse = np.inf
         self.best_count = 0
+        self.ot_ver = args.ot_ver
         
 
     def train(self):
@@ -116,7 +125,7 @@ class Trainer(object):
             self.logger.info('-' * 5 + 'Epoch {}/{}'.format(epoch, args.max_epoch) + '-' * 5)
             self.epoch = epoch
             self.train_epoch()
-            if epoch == 0:
+            if epoch == 0: # sanity check
                 self.val_epoch()
             elif epoch % args.val_epoch == 0 and epoch >= args.val_start:
                 self.val_epoch()
@@ -141,9 +150,13 @@ class Trainer(object):
             N = inputs.size(0)
 
             with torch.set_grad_enabled(True):
-                outputs, outputs_normed = self.model(inputs)
                 # Compute OT loss.
-                ot_loss,wd,ot_obj_value = self.ot_loss(outputs_normed, outputs, points)
+                if self.ot_ver == 2:
+                    outputs, outputs_normed, betas = self.model(inputs)
+                    ot_loss,wd,ot_obj_value = self.ot_loss(outputs_normed, outputs, points, betas)
+                else:
+                    outputs, outputs_normed = self.model(inputs)
+                    ot_loss,wd,ot_obj_value = self.ot_loss(outputs_normed, outputs, points)
                 ot_loss = ot_loss * self.args.wot
                 ot_obj_value = ot_obj_value * self.args.wot
                 epoch_ot_loss.update(ot_loss.item(), N)
@@ -214,7 +227,7 @@ class Trainer(object):
             inputs = inputs.to(self.device)
             assert inputs.size(0) == 1, 'the batch size should equal to 1 in validation mode'
             with torch.set_grad_enabled(False):
-                outputs, _ = self.model(inputs)
+                outputs = self.model(inputs)[0]
                 res = count[0].item() - torch.sum(outputs).item()
                 epoch_res.append(res)
 
