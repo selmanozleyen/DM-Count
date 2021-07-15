@@ -18,7 +18,7 @@ class VGG(nn.Module):
             nn.ReLU(inplace=True),
         )
         self.density_layer = nn.Sequential(nn.Conv2d(128, 1, 1), nn.ReLU())
-        self.density_layer2 = nn.Sequential(nn.Conv2d(128, 1, 1),nn.Flatten())
+        self.density_layer2 = nn.Sequential(nn.Conv2d(128, 1, 1),nn.Flatten(),nn.ReLU())
 
     def forward(self, x):
         x = self.features(x)

@@ -52,7 +52,10 @@ class OT_Loss3(Module):
                 source_prob = normed_density[idx][0].view([-1]).detach()
                 target_prob = (torch.ones([len(im_points)]) / len(im_points)).to(self.device)
                 # use sinkhorn to solve OT, compute optimal beta.
-                P, log = sinkhorn(target_prob, source_prob, dis, self.reg, maxIter=self.num_of_iter_in_ot, log=True)
+                warm_start = {'v':v_pred[idx].detach()}
+                P, log = sinkhorn(a=target_prob, b=source_prob, 
+                C=dis, reg=self.reg, maxIter=self.num_of_iter_in_ot, log=True,
+                warm_start=warm_start)
                 _, beta = log['alpha'], log['beta'] # size is the same as source_prob: [#cood * #cood]
                 u, v, K = log['u'], log['v'],log['K']
                 Kv = torch.matmul(K, v_pred[idx])
