@@ -149,19 +149,18 @@ def sinkhorn_knopp(a, b, C, reg=1e-1, maxIter=1000, stopThr=1e-9,
         log = {'err': []}
 
 
-    K = torch.empty(C.shape, dtype=C.dtype,device=device)
-    torch.div(C, -reg, out=K)
-    torch.exp(K, out=K)
     if warm_start is not None:
         v = warm_start['v']
-        KTu = torch.empty(v.shape, dtype=v.dtype,device=device)
-        Kv = torch.empty((na), dtype=a.dtype,device=device)
-        torch.matmul(K, v, out=Kv)
-        u = torch.div(a, Kv + M_EPS)
+        u = warm_start['u']
+        K = warm_start['K']
         # allocate memory beforehand
     else:
         u = torch.ones(na, dtype=a.dtype).to(device) / na
         v = torch.ones(nb, dtype=b.dtype).to(device) / nb
+        K = torch.empty(C.shape, dtype=C.dtype,device=device)
+        torch.div(C, -reg, out=K)
+        torch.exp(K, out=K)
+        
 
     b_hat = torch.empty(b.shape, dtype=C.dtype).to(device)
 
@@ -169,8 +168,8 @@ def sinkhorn_knopp(a, b, C, reg=1e-1, maxIter=1000, stopThr=1e-9,
     err = 1
 
     # allocate memory beforehand
-    # KTu = torch.empty(v.shape, dtype=v.dtype,device=device)
-    # Kv = torch.empty(u.shape, dtype=u.dtype,device=device)
+    KTu = torch.empty(v.shape, dtype=v.dtype,device=device)
+    Kv = torch.empty(u.shape, dtype=u.dtype,device=device)
 
     while (err > stopThr and it <= maxIter):
         upre, vpre = u, v
@@ -206,7 +205,6 @@ def sinkhorn_knopp(a, b, C, reg=1e-1, maxIter=1000, stopThr=1e-9,
         log['v'] = v
         log['alpha'] = reg * torch.log(u + M_EPS)
         log['beta'] = reg * torch.log(v + M_EPS)
-        log['K'] = K
 
     # transport plan
     P = u.reshape(-1, 1) * K * v.reshape(1, -1)

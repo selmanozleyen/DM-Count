@@ -125,7 +125,7 @@ class Trainer(object):
             self.logger.info('-' * 5 + 'Epoch {}/{}'.format(epoch, args.max_epoch) + '-' * 5)
             self.epoch = epoch
             self.train_epoch()
-            if epoch == 0: # sanity check
+            if False and epoch == 0: # sanity check
                 self.val_epoch()
             elif epoch % args.val_epoch == 0 and epoch >= args.val_start:
                 self.val_epoch()
@@ -134,6 +134,10 @@ class Trainer(object):
         epoch_ot_loss = AverageMeter()
         epoch_ot_obj_value = AverageMeter()
         epoch_wd = AverageMeter()
+        if self.ot_ver == 2:
+            epoch_errs = AverageMeter()
+            epoch_v = AverageMeter()
+
         epoch_count_loss = AverageMeter()
         epoch_tv_loss = AverageMeter()
         epoch_loss = AverageMeter()
@@ -152,17 +156,20 @@ class Trainer(object):
             with torch.set_grad_enabled(True):
                 # Compute OT loss.
                 if self.ot_ver == 2:
-                    outputs, outputs_normed, betas = self.model(inputs)
-                    ot_loss,wd,ot_obj_value = self.ot_loss(outputs_normed, outputs, points, betas)
+                    outputs, outputs_normed, betas = self.model(inputs, gt_discrete)
+                    ot_loss, lossv, wd,ot_obj_value, errs = self.ot_loss(outputs_normed, outputs, points, betas)
+                    epoch_errs.update(errs,N)   
+                    epoch_v.update(lossv.item(), N)
+                    ot_loss = ot_loss * self.args.wot
+                    lossv = lossv*self.args.woc
                 else:
                     outputs, outputs_normed = self.model(inputs)
                     ot_loss,wd,ot_obj_value = self.ot_loss(outputs_normed, outputs, points)
-                ot_loss = ot_loss * self.args.wot
+                    ot_loss = ot_loss * self.args.wot
                 ot_obj_value = ot_obj_value * self.args.wot
                 epoch_ot_loss.update(ot_loss.item(), N)
                 epoch_ot_obj_value.update(ot_obj_value.item(), N)
                 epoch_wd.update(wd, N)
-
                 # Compute counting loss.
                 count_loss = self.mae(outputs.sum(1).sum(1).sum(1),
                                       torch.from_numpy(gd_count).float().to(self.device))
@@ -176,8 +183,11 @@ class Trainer(object):
                     1) * torch.from_numpy(gd_count).float().to(self.device)).mean(0) * self.args.wtv
                 epoch_tv_loss.update(tv_loss.item(), N)
 
-                loss = ot_loss + count_loss + tv_loss
-
+                
+                if self.ot_ver == 2:
+                    loss = ot_loss + count_loss + tv_loss + lossv
+                else:
+                    loss = ot_loss + count_loss + tv_loss # + lossv
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
@@ -188,24 +198,45 @@ class Trainer(object):
                 epoch_mse.update(np.mean(pred_err * pred_err), N)
                 epoch_mae.update(np.mean(abs(pred_err)), N)
 
-        self.logger.info(
-            'Epoch {} Train, Loss: {:.2f}, OT Loss: {:.2e}, Wass Distance: {:.2f}, OT obj value: {:.2f}, '
-            'Count Loss: {:.2f}, TV Loss: {:.2f}, MSE: {:.2f} MAE: {:.2f}, Cost {:.1f} sec'
-                .format(self.epoch, epoch_loss.get_avg(), epoch_ot_loss.get_avg(), epoch_wd.get_avg(),
-                        epoch_ot_obj_value.get_avg(), epoch_count_loss.get_avg(), epoch_tv_loss.get_avg(),
-                        np.sqrt(epoch_mse.get_avg()), epoch_mae.get_avg(),
-                        time.time() - epoch_start))
+        if self.ot_ver == 2:
+            self.logger.info(
+                'Epoch {} Train, Loss: {:.2f}, OT Loss: {:.2e}, Wass Distance: {:.2f}, Err: {:.3e}, '
+                'Count Loss: {:.2f}, TV Loss: {:.2f}, MSE: {:.2f} MAE: {:.2f}, V: {:.2e},, Cost {:.1f} sec'
+                    .format(self.epoch, epoch_loss.get_avg(), epoch_ot_loss.get_avg(), epoch_wd.get_avg(),
+                            epoch_errs.get_avg(), epoch_count_loss.get_avg(), epoch_tv_loss.get_avg(),
+                            np.sqrt(epoch_mse.get_avg()), epoch_mae.get_avg(),epoch_v.get_avg(),
+                            time.time() - epoch_start))
 
 
-        mlflow.log_metric('train_loss',epoch_loss.get_avg(),step=self.epoch)
-        mlflow.log_metric('ot_loss',epoch_ot_loss.get_avg(),step=self.epoch)
-        mlflow.log_metric('wd',epoch_wd.get_avg(),step=self.epoch)
-        mlflow.log_metric('ot_obj',epoch_ot_obj_value.get_avg(),step=self.epoch)
-        mlflow.log_metric('count_loss',epoch_count_loss.get_avg(),step=self.epoch)
-        mlflow.log_metric('tv_loss',epoch_tv_loss.get_avg(),step=self.epoch)
-        mlflow.log_metric('train_rmse',np.sqrt(epoch_mse.get_avg()),step=self.epoch)
-        mlflow.log_metric('train_mae',epoch_mae.get_avg(),step=self.epoch)
-        mlflow.log_metric('epoch_train_time',time.time() - epoch_start,step=self.epoch)
+            mlflow.log_metric('train_loss',epoch_loss.get_avg(),step=self.epoch)
+            mlflow.log_metric('ot_loss',epoch_ot_loss.get_avg(),step=self.epoch)
+            mlflow.log_metric('wd',epoch_wd.get_avg(),step=self.epoch)
+            mlflow.log_metric('ot_obj',epoch_ot_obj_value.get_avg(),step=self.epoch)
+            mlflow.log_metric('ot_err',epoch_errs.get_avg(),step=self.epoch)
+            mlflow.log_metric('v_constrain',epoch_v.get_avg(),step=self.epoch)
+            mlflow.log_metric('count_loss',epoch_count_loss.get_avg(),step=self.epoch)
+            mlflow.log_metric('tv_loss',epoch_tv_loss.get_avg(),step=self.epoch)
+            mlflow.log_metric('train_rmse',np.sqrt(epoch_mse.get_avg()),step=self.epoch)
+            mlflow.log_metric('train_mae',epoch_mae.get_avg(),step=self.epoch)
+        else:
+            self.logger.info(
+                'Epoch {} Train, Loss: {:.2f}, OT Loss: {:.2e}, Wass Distance: {:.2f}, OT obj value: {:.2f}, '
+                'Count Loss: {:.2f}, TV Loss: {:.2f}, MSE: {:.2f} MAE: {:.2f}, Cost {:.1f} sec'
+                    .format(self.epoch, epoch_loss.get_avg(), epoch_ot_loss.get_avg(), epoch_wd.get_avg(),
+                            epoch_ot_obj_value.get_avg(), epoch_count_loss.get_avg(), epoch_tv_loss.get_avg(),
+                            np.sqrt(epoch_mse.get_avg()), epoch_mae.get_avg(),
+                            time.time() - epoch_start))
+
+
+            mlflow.log_metric('train_loss',epoch_loss.get_avg(),step=self.epoch)
+            mlflow.log_metric('ot_loss',epoch_ot_loss.get_avg(),step=self.epoch)
+            mlflow.log_metric('wd',epoch_wd.get_avg(),step=self.epoch)
+            mlflow.log_metric('ot_obj',epoch_ot_obj_value.get_avg(),step=self.epoch)
+            mlflow.log_metric('count_loss',epoch_count_loss.get_avg(),step=self.epoch)
+            mlflow.log_metric('tv_loss',epoch_tv_loss.get_avg(),step=self.epoch)
+            mlflow.log_metric('train_rmse',np.sqrt(epoch_mse.get_avg()),step=self.epoch)
+            mlflow.log_metric('train_mae',epoch_mae.get_avg(),step=self.epoch)
+            mlflow.log_metric('epoch_train_time',time.time() - epoch_start,step=self.epoch)
 
 
 

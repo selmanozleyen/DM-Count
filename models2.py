@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 import torch.utils.model_zoo as model_zoo
 from torch.nn import functional as F
@@ -15,17 +16,51 @@ class VGG(nn.Module):
             nn.Conv2d(512, 256, kernel_size=3, padding=1),
             nn.ReLU(inplace=True),
             nn.Conv2d(256, 128, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True),
         )
-        self.density_layer = nn.Sequential(nn.Conv2d(128, 1, 1), nn.ReLU())
-        self.density_layer2 = nn.Sequential(nn.Conv2d(128, 1, 1),nn.Flatten(),nn.ReLU())
+        # self.into_mu = nn.ReLU(inplace=True)
 
-    def forward(self, x):
+        # self.into_v = nn.Sequential(
+        #     nn.Flatten(),
+        #     nn.Softmax(dim=1),
+        # )
+        # self.reg_layer2 = nn.Sequential(
+        #     nn.Flatten(),
+        #     nn.Linear(1024*2,1024*3//2),
+        #     nn.Dropout(0.1),
+        #     nn.ReLU(),
+        #     nn.Linear(1024*3//2,1024*3//2),
+        #     nn.Dropout(0.1),
+        #     nn.ReLU(),
+        #     nn.Linear(1024*3//2,1024),
+        #     nn.Dropout(0.2),
+        #     nn.ReLU(),
+        #     nn.Linear(1024,1024),
+        #     nn.Dropout(0.2),
+        #     nn.Linear(1024,1024),
+        #     nn.Dropout(0.2),
+        #     nn.Linear(1024,1024),
+        #     nn.Dropout(0.2),
+        #     nn.Linear(1024,1024),
+        #     nn.Dropout(0.2),
+        #     nn.ReLU(),
+        #     nn.Linear(1024,1024),
+        #     nn.Softmax(dim=1)
+        # )
+        self.density_layer = nn.Sequential(nn.Conv2d(128, 1, 1), nn.ReLU())
+        self.density_layer2 = nn.Sequential(nn.Conv2d(128, 1, 1),nn.Flatten(),nn.Softmax(dim=1))
+
+    def forward(self, x, gt_discrete=None):
+        if gt_discrete is not None:
+            # gt_sum = gt_discrete.view([B, -1]).sum(1).unsqueeze(1).unsqueeze(2).unsqueeze(3)
+            # gt_normed = gt_discrete / (gt_sum + 1e-6)
+            # x2 = torch.cat((x2, gt_normed),dim=1)
+            pass
+            #x2 = self.reg_layer2(x)
         x = self.features(x)
         x = F.upsample_bilinear(x, scale_factor=2)
         x = self.reg_layer(x)
-        mu = self.density_layer(x)
         v = self.density_layer2(x)
+        mu = self.density_layer(x)
         B, C, H, W = mu.size()
         mu_sum = mu.view([B, -1]).sum(1).unsqueeze(1).unsqueeze(2).unsqueeze(3)
         mu_normed = mu / (mu_sum + 1e-6)
@@ -57,3 +92,9 @@ def vgg19_2():
     model = VGG(make_layers(cfg['E']))
     model.load_state_dict(model_zoo.load_url(model_urls['vgg19']), strict=False)
     return model
+
+# class D(nn.Module):
+#     def __init__(self):
+#         super(D, self).__init__()
+#         self.
+#     def forward(self,x,y):
