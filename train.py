@@ -31,8 +31,9 @@ def parse_args():
                         help='the num of training process')
     parser.add_argument('--crop-size', type=int, default=512,
                         help='the crop size of the train image')
-    parser.add_argument('--woc', type=float, default=1.0, help='weight on Constrain loss')
     parser.add_argument('--wot', type=float, default=0.1, help='weight on OT loss')
+    parser.add_argument('--wou', type=float, default=0.1, help='weight on OT loss')
+    parser.add_argument('--wov', type=float, default=0.1, help='weight on OT loss')
     parser.add_argument('--wtv', type=float, default=0.01, help='weight on TV loss')
     parser.add_argument('--reg', type=float, default=10.0,
                         help='entropy regularization in sinkhorn')
