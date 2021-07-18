@@ -18,16 +18,18 @@ class VGG(nn.Module):
             nn.ReLU(inplace=True),
         )
         self.density_layer = nn.Sequential(nn.Conv2d(128, 1, 1), nn.ReLU())
+        self.density_layer2 = nn.Sequential(nn.Conv2d(128, 1, 1),nn.Flatten(),nn.ReLU())
 
     def forward(self, x):
         x = self.features(x)
         x = F.upsample_bilinear(x, scale_factor=2)
         x = self.reg_layer(x)
         mu = self.density_layer(x)
+        alpha = self.density_layer2(x)
         B, C, H, W = mu.size()
         mu_sum = mu.view([B, -1]).sum(1).unsqueeze(1).unsqueeze(2).unsqueeze(3)
         mu_normed = mu / (mu_sum + 1e-6)
-        return mu, mu_normed
+        return mu, mu_normed, alpha
 
 def make_layers(cfg, batch_norm=False):
     layers = []

@@ -180,8 +180,8 @@ class Trainer(object):
                     ot_loss = ot_loss * self.args.wot
                     lossv = lossv*self.args.wou
                 else:
-                    outputs, outputs_normed = self.model(inputs)
-                    ot_loss,wd,ot_obj_value = self.ot_loss(outputs_normed, outputs, points)
+                    outputs, outputs_normed, alpha = self.model(inputs)
+                    ot_loss,wd,ot_obj_value = self.ot_loss(outputs_normed, outputs, points, alpha)
                     ot_loss = ot_loss * self.args.wot
                 ot_obj_value = ot_obj_value * self.args.wot
                 epoch_ot_loss.update(ot_loss.item(), N)
@@ -202,7 +202,7 @@ class Trainer(object):
 
                 
                 if self.ot_ver == 3:
-                    loss = ot_loss + count_loss + lossv + lossu +tv_loss
+                    loss = ot_loss + count_loss + lossv + lossu + tv_loss
                 if self.ot_ver == 2:
                     loss = ot_loss + count_loss + lossv + tv_loss
                 else:
